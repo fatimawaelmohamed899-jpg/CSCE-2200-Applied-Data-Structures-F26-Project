@@ -1,3 +1,5 @@
+//memory minimization is a goal..
+
 #ifndef DELTA_ENCODER_HPP
 #define DELTA_ENCODER_HPP
 
