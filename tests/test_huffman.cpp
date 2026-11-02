@@ -41,10 +41,12 @@ void testHuffmanTree() {
 
 int main() {
     std::cout << "=================================================\n";
-    std::cout << "   Milestone 1 Verification Suite  SUCCEDEDED     \n";
+    std::cout << "   Milestone 1 Verification Suite  \n";
     std::cout << "=================================================\n";
 
     testDeltaEncoding();
     testHuffmanTree();
+
+    std::cout << "   Milestone 1 Test Passes Successfully!  \n";
     return 0;
 }
