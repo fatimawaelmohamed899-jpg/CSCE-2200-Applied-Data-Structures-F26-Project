@@ -1,7 +1,7 @@
 #pragma once
 
 template <typename Data, int CAP>
-class Queue {
+class Deque {
 	private:
 		int size = 0;
 		Data arr[CAP];
@@ -9,14 +9,18 @@ class Queue {
 		int rear = 0;
 	
 	public:
-		Queue<Data, CAP>(){}
+		Deque(){}
 
 		bool full(){
-			return size == CAP-1;
+			return size == CAP;
 		}
 
 		bool empty(){
 			return size == 0;
+		}
+
+		int getSize(){
+			return size;
 		}
 
 		void push_back(Data sample){
@@ -50,7 +54,7 @@ class Queue {
 		}
 
 		Data getBack(){
-			return arr[rear];
+			return arr[(rear - 1 + CAP) % CAP];
 		}
 
 };

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Queue.hpp"
+#include "Deque.hpp"
 
 struct Entry{
 	int id;
@@ -8,17 +8,17 @@ struct Entry{
 };
 
 template<int W>
-class MonotoicDeque{
+class MonotonicDeque{
 	private:
-		Queue<Entry, W> maxQueue;
-		Queue<Entry, W> minQueue;
+		Deque<Entry, W> maxQueue;
+		Deque<Entry, W> minQueue;
 		int next_id=0;
 
 	public:
-		MonotoicDeque<Entry, W>(){}
+		MonotonicDeque(){}
 
 		void push(double sample){
-			// Window Change
+			// Discard if out of window range
 			if(!maxQueue.empty() && maxQueue.getFront().id + W <= next_id)
 				maxQueue.pop_front();
 
@@ -27,24 +27,24 @@ class MonotoicDeque{
 
 			// Max tracking
 			// Pop from back until rear is greater than to value
-			while(!maxQueue.empty() && maxQueue.getBack() <= sample)
+			while(!maxQueue.empty() && maxQueue.getBack().val <= sample)
 				maxQueue.pop_back();
 			maxQueue.push_back({next_id, sample});
 
 			// Min tracking
 			// Pop from back until rear is less than to value
-			while(!minQueue.empty() && minQueue.getBack() >= sample)
+			while(!minQueue.empty() && minQueue.getBack().val >= sample)
 				minQueue.pop_back();
 			minQueue.push_back({next_id, sample});
 
 			next_id++;
 		}
 
-		void getMax(){
-			return maxQueue.getFront();
+		double getMax(){
+			return maxQueue.getFront().val;
 		}
 
-		void getMin(){
-			return minQueue.getFront();
+		double getMin(){
+			return minQueue.getFront().val;
 		}
 };
