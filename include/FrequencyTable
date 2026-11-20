@@ -1,19 +1,1 @@
-#pragma once
 
-class FrequencyTable {
-private:
-    static const int capacity = 256;
-    int values[capacity];
-    int counts[capacity];
-    int total;
-
-public:
-    FrequencyTable();
-
-    bool addDelta(int delta);
-    int frequencyOf(int delta) const;
-    int exportArrays(int symbols[], int frequencies[],
-                     int maxSize) const;
-    int uniqueCount() const;
-    void clear();
-};
