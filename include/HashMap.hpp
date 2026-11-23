@@ -1,7 +1,7 @@
+
 #pragma once
 
 // Information stored for each sensor
-// Statistics and alarm calculations are added in Milestone 2
 struct SensorStats {
     int sampleCount;
     double sum;
@@ -11,7 +11,6 @@ struct SensorStats {
     double highThreshold;
     bool alarmActive;
 
-    // Avoid division by zero when no readings exist
     double mean() const {
         if (sampleCount == 0)
             return 0.0;
@@ -20,8 +19,7 @@ struct SensorStats {
     }
 };
 
-// Fixedsize hash map: sensor ID -> sensor information
-// Uses linear probing to handle collisions
+// Fixed size hash map using linear probing
 class SensorHashMap {
 public:
     static const int capacity = 11;
@@ -32,7 +30,6 @@ private:
     static const int occupied = 1;
     static const int deleted = 2;
 
-    // One slot in the hash map.
     struct Entry {
         char sensorId[maxLength];
         SensorStats stats;
@@ -42,8 +39,8 @@ private:
     Entry table[capacity];
     int used;
 
-    // Check that the ID exists, is not empty, and fits
-    static bool validKey(const char* id) {
+    // Check if Sensor ID is valid
+    bool validKey(const char* id) const {
         if (id == nullptr || id[0] == '\0')
             return false;
 
@@ -55,8 +52,8 @@ private:
         return false;
     }
 
-    // Compare two IDs character by character
-    static bool sameId(const char* first, const char* second) {
+    // Compare two Sensor IDs
+    bool sameId(const char* first, const char* second) const {
         int i = 0;
 
         while (first[i] != '\0' && second[i] != '\0') {
@@ -66,11 +63,10 @@ private:
             i++;
         }
 
-        // Both IDs must end at the same position
         return first[i] == second[i];
     }
 
-    // Find the slot containing an ID return -1 when the ID is invalid or missing
+    // Find the position of a sensor
     int findIndex(const char* id) const {
         if (!validKey(id))
             return -1;
@@ -78,7 +74,6 @@ private:
         int start = hash(id);
 
         for (int step = 0; step < capacity; step++) {
-            // go to zero after the last slot.
             int index = (start + step) % capacity;
 
             if (table[index].state == empty)
@@ -88,15 +83,13 @@ private:
                 sameId(table[index].sensorId, id)) {
                 return index;
             }
-
-            // Keep searching past deleted slots or other IDs
         }
 
         return -1;
     }
 
 public:
-    // Prepare an empty map.
+    // Constructor
     SensorHashMap() : used(0) {
         for (int i = 0; i < capacity; i++) {
             table[i].state = empty;
@@ -105,9 +98,7 @@ public:
         }
     }
 
-    // DJB2 string hash: combine character values into a starting slot
-    // Public so tests can identify colliding IDs
-    // Return -1 for invalid IDs
+    // DJB2 hash function
     int hash(const char* id) const {
         if (!validKey(id))
             return -1;
@@ -115,13 +106,14 @@ public:
         unsigned long value = 5381;
 
         for (int i = 0; id[i] != '\0'; i++) {
-            value = value * 33 + static_cast<unsigned char>(id[i]);
+            value = value * 33 +
+                static_cast<unsigned char>(id[i]);
         }
 
         return static_cast<int>(value % capacity);
     }
 
-    // Add a new sensor and reject invalid IDs, duplicates, and a full table.
+    // Insert a sensor
     bool insert(const char* id, const SensorStats& stats) {
         if (!validKey(id))
             return false;
@@ -137,11 +129,9 @@ public:
         for (int step = 0; step < capacity; step++) {
             int index = (start + step) % capacity;
 
-            // Empty and deleted slots can both be reused.
             if (table[index].state != occupied) {
                 int i = 0;
 
-                // Copy the ID into the map's own fixed array
                 while (id[i] != '\0') {
                     table[index].sensorId[i] = id[i];
                     i++;
@@ -150,8 +140,8 @@ public:
                 table[index].sensorId[i] = '\0';
                 table[index].stats = stats;
                 table[index].state = occupied;
-
                 used++;
+
                 return true;
             }
         }
@@ -159,7 +149,7 @@ public:
         return false;
     }
 
-    // Copy the sensor's information into result leave result unchanged if the sensor is missing
+    // Get sensor statistics
     bool get(const char* id, SensorStats& result) const {
         int index = findIndex(id);
 
@@ -170,12 +160,12 @@ public:
         return true;
     }
 
-    // Check whether a sensor exists
+    // Check if sensor exists
     bool contains(const char* id) const {
         return findIndex(id) != -1;
     }
 
-    // Replace an existing sensor's information
+    // Update sensor information
     bool update(const char* id, const SensorStats& stats) {
         int index = findIndex(id);
 
@@ -186,7 +176,7 @@ public:
         return true;
     }
 
-    // Remove a sensor while preserving collision searches
+    // Remove a sensor
     bool remove(const char* id) {
         int index = findIndex(id);
 
@@ -199,12 +189,14 @@ public:
         return true;
     }
 
-    // Return the number of sensors currently stored
+    // Number of stored sensors
     int size() const {
         return used;
     }
 
-    // add a sensor with its allowed reading range
+    // MILESTONE 2
+
+    // Register a sensor with threshold limits
     bool addSensor(const char* id, double low, double high) {
         if (low > high)
             return false;
@@ -212,31 +204,33 @@ public:
         SensorStats data = {};
         data.lowThreshold = low;
         data.highThreshold = high;
+
         return insert(id, data);
     }
 
-    //change limits without erasing previous readings
+    // Change sensor threshold limits
     bool setThresholds(const char* id, double low, double high) {
         if (low > high)
             return false;
 
         int index = findIndex(id);
+
         if (index == -1)
             return false;
 
         SensorStats& data = table[index].stats;
+
         data.lowThreshold = low;
         data.highThreshold = high;
-        // Recheck the last reading if one exists.
-        // Only the current alarm state is stored; we do not store the last value,
-        // so apply new thresholds to future readings instead.
+
+        // New thresholds apply to future readings
         return true;
     }
 
-    //update one sensor and report its new alarm status
-    // returns false for a sensor that was not registered
+    // Process a reading and update statistics and alarm
     bool addReading(const char* id, double value, bool& alarmNow) {
         int index = findIndex(id);
+
         if (index == -1)
             return false;
 
@@ -245,20 +239,24 @@ public:
         if (data.sampleCount == 0) {
             data.minimum = value;
             data.maximum = value;
-        } else {
+        }
+        else {
             if (value < data.minimum)
                 data.minimum = value;
+
             if (value > data.maximum)
                 data.maximum = value;
         }
 
         data.sampleCount++;
         data.sum += value;
-        data.alarmActive = (value < data.lowThreshold ||
-                            value > data.highThreshold);
+
+        data.alarmActive =
+            (value < data.lowThreshold ||
+             value > data.highThreshold);
+
         alarmNow = data.alarmActive;
+
         return true;
     }
-
-    // read current stats using the existing get(id, result).
 };
