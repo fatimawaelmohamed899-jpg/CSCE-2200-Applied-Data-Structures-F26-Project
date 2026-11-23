@@ -1,7 +1,7 @@
 #pragma once
 
 // Member 4: Sensor Monitoring and Alarms
-// Milestone 1: Store and find sensors using a fixed-size hash map
+// Milestone 1: Store and find sensors using a fixed size hash map
 // Milestone 2: Track readings and check threshold alarms for each sensor
 // The application uses this map to access sensor data by its unique ID
 
@@ -15,7 +15,7 @@ struct SensorStats {
     double highThreshold;
     bool alarmActive;
 
-    // Calculate the average reading; return 0 when there are no readings
+    // Calculate the average reading return 0 when there are no readings
     double mean() const {
         if (sampleCount == 0)
             return 0.0;
@@ -24,7 +24,7 @@ struct SensorStats {
     }
 };
 
-// Fixed-size hash map: each sensor ID maps to its own statistics
+// Fixedsize hash map each sensor ID maps to its own statistics
 // Linear probing handles collisions without STL containers
 class SensorHashMap {
 public:
@@ -75,7 +75,7 @@ private:
     }
 
     // Look up a sensor by probing from its hashed position
-    // Continue past deleted slots; stop at an empty slot
+    // Continue past deleted slots and stop at an empty slot
     int findIndex(const char* id) const {
         if (!validKey(id))
             return -1;
@@ -276,3 +276,4 @@ public:
         return true;
     }
 };
+
