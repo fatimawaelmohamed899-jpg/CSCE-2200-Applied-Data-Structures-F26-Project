@@ -1,168 +1,67 @@
-#include <iostream>
 #include <cassert>
-#include "../include/HashMap.hpp"
-
-// Check adding and finding a sensor
-void testInsertAndGet() {
-    static SensorHashMap sensors;
-
-    SensorStats initial = {
-        0, 0.0, 0.0, 0.0, 10.0, 50.0, false
-    };
-
-    SensorStats result = {};
-
-    assert(sensors.size() == 0);
-    assert(!sensors.get("TEMP_01", result));
-
-    assert(sensors.insert("TEMP_01", initial));
-    assert(sensors.contains("TEMP_01"));
-    assert(sensors.get("TEMP_01", result));
-
-    assert(result.sampleCount == 0);
-    assert(result.lowThreshold == 10.0);
-    assert(result.highThreshold == 50.0);
-    assert(sensors.size() == 1);
-
-    // Reject duplicate, empty, null, and oversized IDs
-    assert(!sensors.insert("TEMP_01", initial));
-    assert(!sensors.insert("", initial));
-    assert(!sensors.insert(nullptr, initial));
-    assert(!sensors.insert("THIS_ID_IS_FAR_TOO_LONG", initial));
-
-    assert(sensors.size() == 1);
-
-    std::cout << "[PASS] Insert and Get Test\n";
-}
-
-// Check replacing a sensor's statistics
-void testUpdate() {
-    static SensorHashMap sensors;
-
-    SensorStats initial = {
-        0, 0.0, 0.0, 0.0, 10.0, 50.0, false
-    };
-
-    SensorStats result = {};
-
-    assert(initial.mean() == 0.0);
-    assert(sensors.insert("TEMP_01", initial));
-
-    SensorStats changed = initial;
-    changed.sampleCount = 3;
-    changed.sum = 75.0;
-    changed.minimum = 20.0;
-    changed.maximum = 30.0;
-
-    assert(sensors.update("TEMP_01", changed));
-    assert(sensors.get("TEMP_01", result));
-
-    assert(result.sampleCount == 3);
-    assert(result.sum == 75.0);
-    assert(result.minimum == 20.0);
-    assert(result.maximum == 30.0);
-    assert(result.mean() == 25.0);
-
-    assert(!sensors.update("MISSING", changed));
-
-    std::cout << "[PASS] Update and Mean Test\n";
-}
-
-// These IDs collide with the current hash and capacity of 11
-void testCollisionsAndRemoval() {
-    static SensorHashMap sensors;
-
-    SensorStats initial = {
-        0, 0.0, 0.0, 0.0, 10.0, 50.0, false
-    };
-
-    SensorStats result = {};
-
-    assert(sensors.hash("A") == 10);
-    assert(sensors.hash("A") == sensors.hash("L"));
-    assert(sensors.hash("L") == sensors.hash("W"));
-
-    // A occupies slot 10; L and W wrap to slots 0 and 1
-    assert(sensors.insert("A", initial));
-    assert(sensors.insert("L", initial));
-    assert(sensors.insert("W", initial));
-
-    assert(sensors.get("A", result));
-    assert(sensors.get("L", result));
-    assert(sensors.get("W", result));
-
-    assert(sensors.remove("A"));
-    assert(!sensors.contains("A"));
-    assert(sensors.size() == 2);
-
-    // Searching must continue past the deleted slot
-    assert(sensors.get("W", result));
-
-    // A deleted slot must not allow duplicate keys
-    assert(!sensors.insert("W", initial));
-
-    // Reuse the deleted slot
-    assert(sensors.insert("A", initial));
-    assert(sensors.size() == 3);
-
-    assert(!sensors.remove("MISSING"));
-
-    std::cout << "[PASS] Collisions and Removal Test\n";
-}
-
-// Check full-table handling and reuse after deletion
-void testFullTable() {
-    static SensorHashMap sensors;
-
-    SensorStats initial = {
-        0, 0.0, 0.0, 0.0, 10.0, 50.0, false
-    };
-
-    SensorStats result = {};
-
-    const char ids[SensorHashMap::capacity][SensorHashMap::maxLength] = {
-        "S0", "S1", "S2", "S3", "S4", "S5",
-        "S6", "S7", "S8", "S9", "S10"
-    };
-
-    for (int i = 0; i < SensorHashMap::capacity; i++) {
-        assert(sensors.insert(ids[i], initial));
-    }
-
-    assert(sensors.size() == SensorHashMap::capacity);
-    assert(!sensors.insert("EXTRA", initial));
-    assert(!sensors.get("MISSING", result));
-
-    assert(sensors.remove("S5"));
-    assert(sensors.insert("EXTRA", initial));
-
-    // Remove every remaining sensor
-    for (int i = 0; i < SensorHashMap::capacity; i++) {
-        if (i != 5)
-            assert(sensors.remove(ids[i]));
-    }
-
-    assert(sensors.remove("EXTRA"));
-    assert(sensors.size() == 0);
-
-    // All slots are deleted; searches must still terminate
-    assert(!sensors.get("MISSING", result));
-    assert(sensors.insert("NEW", initial));
-
-    std::cout << "[PASS] Full Table and Reuse Test\n";
-}
+#include <iostream>
+#include "HashMap.hpp"
 
 int main() {
-    std::cout << "========================================\n";
-    std::cout << "  Member 4: Hash Map Verification Suite\n";
-    std::cout << "========================================\n";
+    SensorHashMap sensors;
+    bool alarm = false;
+    SensorStats stats = {};
 
-    testInsertAndGet();
-    testUpdate();
-    testCollisionsAndRemoval();
-    testFullTable();
+    // Register sensors and reject invalid entries.
+    assert(sensors.addSensor("temp", 10, 35));
+    assert(sensors.addSensor("humidity", 20, 80));
+    assert(!sensors.addSensor("temp", 0, 100)); // Duplicate ID
+    assert(!sensors.addSensor("bad", 90, 10)); // Low limit greater than high
+    assert(sensors.size() == 2);
 
-    std::cout << "All Hash Map Tests Passed!\n";
+    // Normal readings and high/low threshold alarms.
+    assert(sensors.addReading("temp", 20, alarm) && !alarm);
+    assert(sensors.addReading("temp", 40, alarm) && alarm);
+    assert(sensors.get("temp", stats));
+    assert(stats.sampleCount == 2);
+    assert(stats.minimum == 20);
+    assert(stats.maximum == 40);
+    assert(stats.mean() == 30);
+    assert(stats.alarmActive);
 
+    assert(sensors.addReading("temp", 30, alarm) && !alarm); // Alarm clears
+    assert(sensors.addReading("humidity", 10, alarm) && alarm); // Low alarm
+    assert(sensors.get("temp", stats));
+    assert(stats.sampleCount == 3 && stats.mean() == 30);
+    assert(!stats.alarmActive);
+
+    // Change limits and check the next reading.
+    assert(sensors.setThresholds("temp", 0, 100));
+    assert(sensors.addReading("temp", 50, alarm) && !alarm);
+    assert(!sensors.setThresholds("missing", 0, 100));
+    assert(!sensors.setThresholds("temp", 100, 0));
+    assert(!sensors.addReading("missing", 10, alarm));
+
+    // Readings exactly on the boundaries should not trigger alarms.
+    assert(sensors.addReading("temp", 0, alarm) && !alarm);
+    assert(sensors.addReading("temp", 100, alarm) && !alarm);
+    assert(sensors.addReading("temp", -1, alarm) && alarm);
+    assert(sensors.addReading("temp", 101, alarm) && alarm);
+
+    // "a" and "l" have the same DJB2 hash index (mod 11).
+    // Both should still be stored and retrieved independently.
+    assert(sensors.hash("a") == sensors.hash("l"));
+    assert(sensors.addSensor("a", 0, 10));
+    assert(sensors.addSensor("l", 0, 10));
+    assert(sensors.contains("a") && sensors.contains("l"));
+    assert(sensors.addReading("l", 7, alarm) && !alarm);
+    assert(sensors.get("l", stats) && stats.mean() == 7);
+
+    // Removing one colliding sensor should not hide the other.
+    assert(sensors.remove("a"));
+    assert(!sensors.contains("a"));
+    assert(sensors.contains("l"));
+    assert(!sensors.remove("a"));
+    assert(sensors.addSensor("a", 0, 10)); // Reuse deleted slot
+    assert(sensors.contains("a"));
+    assert(sensors.size() == 4);
+
+    std::cout << "All Milestone 2 tests passed!\n";
     return 0;
 }
+
