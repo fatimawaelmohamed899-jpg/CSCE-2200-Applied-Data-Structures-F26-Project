@@ -1,7 +1,11 @@
-
 #pragma once
 
-// Information stored for each sensor
+// Member 4: Sensor Monitoring and Alarms
+// Milestone 1: Store and find sensors using a fixed-size hash map
+// Milestone 2: Track readings and check threshold alarms for each sensor
+// The application uses this map to access sensor data by its unique ID
+
+// Statistics and alarm settings stored for one sensor
 struct SensorStats {
     int sampleCount;
     double sum;
@@ -11,6 +15,7 @@ struct SensorStats {
     double highThreshold;
     bool alarmActive;
 
+    // Calculate the average reading; return 0 when there are no readings
     double mean() const {
         if (sampleCount == 0)
             return 0.0;
@@ -19,13 +24,15 @@ struct SensorStats {
     }
 };
 
-// Fixed size hash map using linear probing
+// Fixed-size hash map: each sensor ID maps to its own statistics
+// Linear probing handles collisions without STL containers
 class SensorHashMap {
 public:
-    static const int capacity = 11;
-    static const int maxLength = 20;
+    static const int capacity = 11;   // Maximum number of sensors
+    static const int maxLength = 20;  // Sensor ID size including the null character
 
 private:
+    // A slot can be unused, occupied, or marked as deleted
     static const int empty = 0;
     static const int occupied = 1;
     static const int deleted = 2;
@@ -36,10 +43,11 @@ private:
         int state;
     };
 
+    // All entries are stored in a fixed array (no dynamic memory)
     Entry table[capacity];
     int used;
 
-    // Check if Sensor ID is valid
+    // Reject empty IDs and IDs that do not fit in the array
     bool validKey(const char* id) const {
         if (id == nullptr || id[0] == '\0')
             return false;
@@ -52,7 +60,7 @@ private:
         return false;
     }
 
-    // Compare two Sensor IDs
+    // Compare two sensor IDs character by character
     bool sameId(const char* first, const char* second) const {
         int i = 0;
 
@@ -66,7 +74,8 @@ private:
         return first[i] == second[i];
     }
 
-    // Find the position of a sensor
+    // Look up a sensor by probing from its hashed position
+    // Continue past deleted slots; stop at an empty slot
     int findIndex(const char* id) const {
         if (!validKey(id))
             return -1;
@@ -89,7 +98,7 @@ private:
     }
 
 public:
-    // Constructor
+    // Initialize every slot as empty and clear its stored data
     SensorHashMap() : used(0) {
         for (int i = 0; i < capacity; i++) {
             table[i].state = empty;
@@ -98,7 +107,7 @@ public:
         }
     }
 
-    // DJB2 hash function
+    // DJB2 converts an ID to a starting index in the table
     int hash(const char* id) const {
         if (!validKey(id))
             return -1;
@@ -113,7 +122,8 @@ public:
         return static_cast<int>(value % capacity);
     }
 
-    // Insert a sensor
+    // Insert a new sensor. reject invalid, duplicate, or full table 
+    // On collision try the following slots until one is available
     bool insert(const char* id, const SensorStats& stats) {
         if (!validKey(id))
             return false;
@@ -149,7 +159,7 @@ public:
         return false;
     }
 
-    // Get sensor statistics
+    // Copy a sensor's statistics into result and return false if not found
     bool get(const char* id, SensorStats& result) const {
         int index = findIndex(id);
 
@@ -160,12 +170,12 @@ public:
         return true;
     }
 
-    // Check if sensor exists
+    // Check whether a sensor ID is already in the map.
     bool contains(const char* id) const {
         return findIndex(id) != -1;
     }
 
-    // Update sensor information
+    // Replace the statistics stored for an existing sensor
     bool update(const char* id, const SensorStats& stats) {
         int index = findIndex(id);
 
@@ -176,7 +186,7 @@ public:
         return true;
     }
 
-    // Remove a sensor
+    // Mark the sensor as deleted so later lookups can still probe past it
     bool remove(const char* id) {
         int index = findIndex(id);
 
@@ -189,14 +199,16 @@ public:
         return true;
     }
 
-    // Number of stored sensors
+    // Return the number of currently stored sensors
     int size() const {
         return used;
     }
 
-    // MILESTONE 2
+    // MILESTONE 2: Application logic built on the Milestone 1 hash map
+    // These methods use insertion and lookup to manage sensor readings
 
-    // Register a sensor with threshold limits
+    // Register a sensor with its allowed low and high readings
+    // Start its statistics at zero and insert it into the hash map
     bool addSensor(const char* id, double low, double high) {
         if (low > high)
             return false;
@@ -208,7 +220,7 @@ public:
         return insert(id, data);
     }
 
-    // Change sensor threshold limits
+    // Find an existing sensor and change its allowed reading range
     bool setThresholds(const char* id, double low, double high) {
         if (low > high)
             return false;
@@ -223,11 +235,13 @@ public:
         data.lowThreshold = low;
         data.highThreshold = high;
 
-        // New thresholds apply to future readings
+        // New limits are checked when the next reading arrives.
         return true;
     }
 
-    // Process a reading and update statistics and alarm
+    // Find the sensor and process one new reading
+    // Update its minimum, maximum, count, sum, and alarm status
+    // alarmNow reports whether this reading is outside the limits
     bool addReading(const char* id, double value, bool& alarmNow) {
         int index = findIndex(id);
 
@@ -236,6 +250,7 @@ public:
 
         SensorStats& data = table[index].stats;
 
+        // The first reading sets both the minimum and maximum
         if (data.sampleCount == 0) {
             data.minimum = value;
             data.maximum = value;
@@ -251,6 +266,7 @@ public:
         data.sampleCount++;
         data.sum += value;
 
+        // Trigger an alarm only when the reading is outside the range
         data.alarmActive =
             (value < data.lowThreshold ||
              value > data.highThreshold);
