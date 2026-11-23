@@ -115,8 +115,7 @@ public:
         unsigned long value = 5381;
 
         for (int i = 0; id[i] != '\0'; i++) {
-            value = value * 33 +
-                static_cast<unsigned char>(id[i]);
+            value = value * 33 + id[i];
         }
 
         return static_cast<int>(value % capacity);
@@ -276,4 +275,5 @@ public:
         return true;
     }
 };
+
 
