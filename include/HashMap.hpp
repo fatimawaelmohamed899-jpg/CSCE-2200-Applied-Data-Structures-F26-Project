@@ -1,5 +1,4 @@
 #pragma once
-#include <cstdio>
 
 // Information stored for each sensor
 // Statistics and alarm calculations are added in Milestone 2
@@ -21,7 +20,7 @@ struct SensorStats {
     }
 };
 
-// Fixed-size hash map: sensor ID -> sensor information
+// Fixedsize hash map: sensor ID -> sensor information
 // Uses linear probing to handle collisions
 class SensorHashMap {
 public:
@@ -200,29 +199,66 @@ public:
         return true;
     }
 
-    // Return the number of sensors currently stored.
+    // Return the number of sensors currently stored
     int size() const {
         return used;
     }
 
-    // Display the table for demonstration.
-    void display() const {
-        for (int i = 0; i < capacity; i++) {
-            std::printf("Slot %2d: ", i);
+    // add a sensor with its allowed reading range
+    bool addSensor(const char* id, double low, double high) {
+        if (low > high)
+            return false;
 
-            if (table[i].state == empty) {
-                std::printf("empty\n");
-            }
-            else if (table[i].state == deleted) {
-                std::printf("deleted\n");
-            }
-            else {
-                std::printf(
-                    "Sensor %s, samples %d\n",
-                    table[i].sensorId,
-                    table[i].stats.sampleCount
-                );
-            }
-        }
+        SensorStats data = {};
+        data.lowThreshold = low;
+        data.highThreshold = high;
+        return insert(id, data);
     }
+
+    //change limits without erasing previous readings
+    bool setThresholds(const char* id, double low, double high) {
+        if (low > high)
+            return false;
+
+        int index = findIndex(id);
+        if (index == -1)
+            return false;
+
+        SensorStats& data = table[index].stats;
+        data.lowThreshold = low;
+        data.highThreshold = high;
+        // Recheck the last reading if one exists.
+        // Only the current alarm state is stored; we do not store the last value,
+        // so apply new thresholds to future readings instead.
+        return true;
+    }
+
+    //update one sensor and report its new alarm status
+    // returns false for a sensor that was not registered
+    bool addReading(const char* id, double value, bool& alarmNow) {
+        int index = findIndex(id);
+        if (index == -1)
+            return false;
+
+        SensorStats& data = table[index].stats;
+
+        if (data.sampleCount == 0) {
+            data.minimum = value;
+            data.maximum = value;
+        } else {
+            if (value < data.minimum)
+                data.minimum = value;
+            if (value > data.maximum)
+                data.maximum = value;
+        }
+
+        data.sampleCount++;
+        data.sum += value;
+        data.alarmActive = (value < data.lowThreshold ||
+                            value > data.highThreshold);
+        alarmNow = data.alarmActive;
+        return true;
+    }
+
+    // read current stats using the existing get(id, result).
 };
