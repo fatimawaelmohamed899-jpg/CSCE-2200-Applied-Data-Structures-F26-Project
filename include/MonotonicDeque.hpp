@@ -12,7 +12,7 @@ class MonotonicDeque{
 	private:
 		Deque<Entry, W> maxQueue;
 		Deque<Entry, W> minQueue;
-		int next_id=0;
+		long long next_id=0;
 
 	public:
 		MonotonicDeque(){}
